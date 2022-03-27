@@ -1,8 +1,9 @@
 # cs-mm
-緬譯巴利藏
+緬譯巴利藏 (未完成)
 
 ## prerequisite
 
-  extract html from tipitaka Pn Daza android apk Books  (mrpndaza@gmail.com) and save in html folder
+Download [Tipitaka in Myanmar Pn Daza](https://play.google.com/store/apps/details?id=mm.pndaza.tipitakamyanmar) , rename .apk to .zip , extract html folder
   
-  node gen
+    node gen
+    pitaka build
