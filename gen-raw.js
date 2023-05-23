@@ -1,15 +1,15 @@
 /* gen myanmar translation of Mula*/
-import {readTextLines, nodefs, writeChanged,toParagraphs } from "ptk/nodebundle.cjs";
+import {readTextLines, nodefs, writeChanged } from "ptk/nodebundle.cjs";
 import {filefix,parafix,ignoreNote, ignoreReuse} from './errata.js';
 import {newbookname,html2tag,patfootnote,patinlinenote,patpidx} from './constant.js';
 
 await nodefs;
 const folder='./Books/' // ren mm.pndaza  apk to zip , extract Books from assets
-const outfolder='off/'
+const outfolder='books'
 const lst=readTextLines('./mm.lst');
 const filter=process.argv[2];
 // const {tokenStat,statResult}=require('./mm-stat');
-const scfolder='../sc/pli/';
+
 let rawcontent='';
 const toArabic=t=>{
     let s='';
@@ -60,20 +60,20 @@ const applyParaFix=(l,fn,pn,lineidx)=>{
 }
 const findFootMarks=(linetext,cb)=>{
     if (linetext.indexOf('class="footnote"')==-1) {
-        return linetext.replace(patinlinenote,(m,beforech,m1,afterch,offset)=>{  //本文內的 注號
+        linetext.replace(patinlinenote,(m,beforech,m1,afterch,offset)=>{                
             if (beforech=='-' || afterch==')' ||m1.length>3) return ;//not a note
             let n=parseInt(toArabic(m1));
-            if (n>199) return m;
-            return cb(n,offset+1,beforech,m1,afterch||'');
+            if (n>199) return ;
+            cb(n,offset+1);
         });
-    } else return linetext;
+    }
 }
 
 let curfn='';
 const logError=(rawlineidx,msg)=>{
     console.log(curfn+'('+(parseInt(rawlineidx)+1)+')',msg);
 }
-const saveFootnotes=(footMarks,footNotes,textlines,html2out,outfn,paraOfLine)=>{
+const appendNoteToText=(footMarks,footNotes,textlines,html2out)=>{
     const out=[].concat(textlines);
     let startline=0,groups=[], notes={};
    
@@ -108,32 +108,24 @@ const saveFootnotes=(footMarks,footNotes,textlines,html2out,outfn,paraOfLine)=>{
         }
     }
     //patching rawtext
-    let thenotes=[],prevpn='';
     for (let lineidx in footMarks) {
         const ln=html2out[parseInt(lineidx)];
         const markers=footMarks[lineidx];
-        
-        out[ln]=findFootMarks(out[ln],(n,offset,before,m1,after)=>{
+        let notes=[];
+        findFootMarks(out[ln],(n,offset)=>{
             if (!markers[n]) {
                 logError(lineidx,'marker without footnote '+n);
-                return before+m1+after;
             } else {                
                 if (markers[n]=='=') {
                     const reuseok=(ignoreReuse[curfn]&&ignoreReuse[curfn].indexOf(parseInt(lineidx))>-1);
                    !reuseok&&logError(lineidx,'reuse footnote '+n);
                 }
-                const pn=paraOfLine[lineidx];
-                if (prevpn!==pn) {
-                    thenotes.push('^n'+pn);
-                }
-                if (markers[n]!=='=') thenotes.push( '^fn'+n+' '+markers[n]);
+                notes.push(offset+'^'+markers[n]);
                 markers[n]='=';//consumed, 下一個相同footmark不會重覆文字，見 dn3_28
-                prevpn=pn;
             }
-            return before+'^f'+n+after;
          })
+        out[ln]+='|'+notes.join(' ');
     }
-    writeChanged(outfn+'-fn.off',thenotes.join('\n'),true)
     return out;
 }
 const repunc=linetext=>{
@@ -159,16 +151,19 @@ const dofile=fn=>{
     let pn='',started=false,pb=0;
     let prevlinewithfootnote=''; //02_digha_03 foot note ၁-၂ 有兩段，合併之 
     const html2out={}; //html line to output line
-    const paraOfLine=[];//^n of given line
 
     const handlePB=line=>{
         if (!line)return true;
         if (line=='--') {
             pb++;
-            if (filter) out[out.length-1]+=('^pb'+pb);
+            if (filter) out[out.length-1]+=('=='+pb+'==');
             return true;
         }
     }
+
+
+
+
     const handleNormalP=l=>out.push(l);
     const handleClass=(classname,text,lineidx)=>{
         if (classname=='footnote') {           
@@ -178,15 +173,10 @@ const dofile=fn=>{
                 footNotes[ lineidx ]=n+'.'+text;
                 prevlinewithfootnote=lineidx;
             } else {
-                // 多行注解
                 footNotes[prevlinewithfootnote]+='\t'+text;
             }
         } else {
-            if (text!=='နမော တဿ ဘဂဝတော အရဟတော သမ္မာသမ္ဗုဒ္ဓဿ'){
-                if (out.length==0) out.push('');
-                out[out.length-1]+=  '^'+classname+text;
-            }
-            
+            out.push(classname+'|'+text);
         }
     }
     
@@ -200,15 +190,16 @@ const dofile=fn=>{
  
         l=l.replace(patpidx,(m,m1)=>{
             pn=toArabic(m1);
-            return '^n'+pn;
+            return pn+'|';
         });
         if (l.indexOf('"paragraph"')>0) {
+            debugger
             console.log('line has paragraph but not parsed',fn,i+1);
             console.log(l.substr(0,80))
         }
 
         l=repunc(l);
-        paraOfLine[i]=pn;
+
 
         ;(!(ignoreNote[fn]&&ignoreNote[fn][pn]))&&findFootMarks(l,n=>{  
                 if (!footMarks[i]) footMarks[i]={};
@@ -220,15 +211,7 @@ const dofile=fn=>{
             if (!m) throw 'header parse errorerror '+fn+' line '+(i+1)+' pn '+pn+' '+l;
             const tag=html2tag[m[1]];
             if (!tag) throw 'unknown markup '+l
-            if (out.length==0) out.push('');
-            
-            const t='^'+tag+' '+m[2];
-            if (tag.startsWith('subhead') && out.length>1) {
-                out.push(t)
-            } else {
-                out[out.length-1]+=t;
-            }
-            
+            out.push(tag+'|'+m[2]);
         } else {
             const m=l.match(/class="([a-z]+)">(.+?)<\/p>/);
             const m2=l.match(/<p>(.+?)<\/p>/);
@@ -242,39 +225,18 @@ const dofile=fn=>{
         }
     } 
 
-    out=saveFootnotes(footMarks,footNotes,out,html2out,outfolder+newfn,paraOfLine);
+    out=appendNoteToText(footMarks,footNotes,out,html2out);
 
     if (filter) {
-        const outcontent=out.join('\n').replace(/\^subhead(.+)\n/g,'^subhead$1');
-        
-        const mmpara = toParagraphs(outcontent.split('\n'));
-        
-        const sclines=readTextLines(scfolder+ newfn +'.ms.off');
-        const scpara = toParagraphs(sclines);
-
-        if (mmpara.length!==scpara.length) {
-            console.log('para not match');
-        } else {
-            for(let i=0;i<scpara.length;i++) {
-                while (mmpara[i][1].length>scpara[i][1].length) {
-                    const lines=mmpara[i][1];
-                    const t=lines.pop();
-                    lines[lines.length-1]+=' '+t;
-                }
-                while  (scpara[i][1].length>mmpara[i][1].length) {
-                    mmpara[i][1].push('');
-                }
-            }
+        const outcontent=out.join('\n');
+        const outfn=outfolder+'/'+newfn+'.txt'
+        if (writeChanged(outfn,outcontent)) {
+            console.log('written',outfn,outcontent.length);
         }
-
-        const outfn=outfolder+newfn+'.ori.off'
-        
-
-        writeChanged(outfn, mmpara.map(it=>it[1].join('\n')).join('\n'),true) 
         // fs.writeFileSync('footNotes.txt',JSON.stringify(footNotes),'utf8');
-        //  fs.writeFileSync(outfn+'-fn.txt',JSON.stringify(footNotes),'utf8');
-     } else {
-         rawcontent+=out.map((line,idx)=>newfn+'_x'+idx+'\t'+line).join('\n')+'\n';
+        // fs.writeFileSync('footMarks.txt',JSON.stringify(footMarks),'utf8');
+    } else {
+        rawcontent+=out.map((line,idx)=>newfn+'_x'+idx+'\t'+line).join('\n')+'\n';
     }
 
     // tokenStat(outcontent);
