@@ -9,7 +9,7 @@ const outfolder='off/'
 const lst=readTextLines('./mm.lst');
 const filter=process.argv[2];
 // const {tokenStat,statResult}=require('./mm-stat');
-const scfolder='../sc/pli/';
+const scfolder='../sc/sc-pli.offtext/';
 let rawcontent='';
 const toArabic=t=>{
     let s='';
