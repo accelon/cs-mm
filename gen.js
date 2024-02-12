@@ -5,7 +5,7 @@ import {newbookname,html2tag,patfootnote,patinlinenote,patpidx} from './constant
 
 await nodefs;
 const folder='./Books/' // ren mm.pndaza  apk to zip , extract Books from assets
-const outfolder='off/'
+const outfolder='off2/'
 const lst=readTextLines('./mm.lst');
 const filter=process.argv[2];
 // const {tokenStat,statResult}=require('./mm-stat');
