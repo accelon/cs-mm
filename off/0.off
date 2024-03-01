@@ -5,7 +5,10 @@
 ^:nn
 ^:center
 ^:subhead
+^:subsubhead
+^:title
 ^:pb
 ^:unindent
 ^:head
 ^:chapter
+^:classe
